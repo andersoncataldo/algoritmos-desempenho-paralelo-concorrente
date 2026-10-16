@@ -43,6 +43,13 @@ public class ChartPanel extends JPanel {
         this.chartType = chartType;
         setBackground(Color.WHITE);
         setFont(new Font("Segoe UI", Font.PLAIN, 12));
+        setToolTipText(""); // Ativa suporte a tooltips interativos
+    }
+
+    @Override
+    public Dimension getPreferredSize() {
+        int w = Math.max(780, dados.size() * 35);
+        return new Dimension(w, 480);
     }
 
     public void atualizarDados(List<BenchmarkSummary> novosDados, DataDistribution distribuicao) {
