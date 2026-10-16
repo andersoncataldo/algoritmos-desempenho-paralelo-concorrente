@@ -2,6 +2,7 @@ import zipfile
 import xml.etree.ElementTree as ET
 import os
 import shutil
+import copy
 
 TEMPLATE_PATH = "Modelo-Artigo.docx"
 OUTPUT_PATH = "Relatorio-Artigo-Ordenacao.docx"
@@ -10,95 +11,123 @@ NS = {
     'w': 'http://schemas.openxmlformats.org/wordprocessingml/2006/main',
     'w14': 'http://schemas.microsoft.com/office/word/2010/wordml'
 }
-ET.register_namespace('w', NS['w'])
-ET.register_namespace('w14', NS['w14'])
+for prefix, uri in NS.items():
+    ET.register_namespace(prefix, uri)
 
-def criar_paragrafo_texto(texto, estilo="TAMainText", negrito=False, italico=False, alinhamento="both", espacamento=360):
-    p = ET.Element(f"{{{NS['w']}}}p")
-    pPr = ET.SubElement(p, f"{{{NS['w']}}}pPr")
-    
-    if estilo:
-        pStyle = ET.SubElement(pPr, f"{{{NS['w']}}}pStyle")
-        pStyle.set(f"{{{NS['w']}}}val", estilo)
+def set_paragraph_text(p, text, font_name="Arial", size_half_points="22", bold=False, italic=False, line_spacing=360, align="both"):
+    """
+    Atualiza o texto de um parágrafo preservando suas propriedades estruturais (pPr),
+    aplicando a formatação exigida (Arial 11, espaçamento 1,5, justificado).
+    """
+    ns_w = NS['w']
+    pPr = p.find(f"{{{ns_w}}}pPr")
+    if pPr is None:
+        pPr = ET.SubElement(p, f"{{{ns_w}}}pPr")
         
-    if alinhamento:
-        jc = ET.SubElement(pPr, f"{{{NS['w']}}}jc")
-        jc.set(f"{{{NS['w']}}}val", alinhamento)
+    # Ajusta espaçamento entre linhas (360 = 1,5 linhas)
+    spacing = pPr.find(f"{{{ns_w}}}spacing")
+    if spacing is None:
+        spacing = ET.SubElement(pPr, f"{{{ns_w}}}spacing")
+    if line_spacing:
+        spacing.set(f"{{{ns_w}}}line", str(line_spacing))
+        spacing.set(f"{{{ns_w}}}lineRule", "auto")
+        spacing.set(f"{{{ns_w}}}after", "120")
         
-    if espacamento:
-        sp = ET.SubElement(pPr, f"{{{NS['w']}}}spacing")
-        sp.set(f"{{{NS['w']}}}line", str(espacamento))
-        sp.set(f"{{{NS['w']}}}lineRule", "auto")
-        sp.set(f"{{{NS['w']}}}after", "120")
+    # Alinhamento justificado
+    if align:
+        jc = pPr.find(f"{{{ns_w}}}jc")
+        if jc is None:
+            jc = ET.SubElement(pPr, f"{{{ns_w}}}jc")
+        jc.set(f"{{{ns_w}}}val", align)
         
-    rPr_p = ET.SubElement(pPr, f"{{{NS['w']}}}rPr")
-    rFonts_p = ET.SubElement(rPr_p, f"{{{NS['w']}}}rFonts")
-    rFonts_p.set(f"{{{NS['w']}}}ascii", "Arial")
-    rFonts_p.set(f"{{{NS['w']}}}hAnsi", "Arial")
-    rFonts_p.set(f"{{{NS['w']}}}cs", "Arial")
-    
-    r = ET.SubElement(p, f"{{{NS['w']}}}r")
-    rPr = ET.SubElement(r, f"{{{NS['w']}}}rPr")
-    rFonts = ET.SubElement(rPr, f"{{{NS['w']}}}rFonts")
-    rFonts.set(f"{{{NS['w']}}}ascii", "Arial")
-    rFonts.set(f"{{{NS['w']}}}hAnsi", "Arial")
-    rFonts.set(f"{{{NS['w']}}}cs", "Arial")
-    
-    sz = ET.SubElement(rPr, f"{{{NS['w']}}}sz")
-    sz.set(f"{{{NS['w']}}}val", "22")  # 11pt
-    szCs = ET.SubElement(rPr, f"{{{NS['w']}}}szCs")
-    szCs.set(f"{{{NS['w']}}}val", "22")
-    
-    if negrito:
-        ET.SubElement(rPr, f"{{{NS['w']}}}b")
-    if italico:
-        ET.SubElement(rPr, f"{{{NS['w']}}}i")
+    # Remove runs antigos
+    for r in list(p.findall(f"{{{ns_w}}}r")):
+        p.remove(r)
         
-    lang = ET.SubElement(rPr, f"{{{NS['w']}}}lang")
-    lang.set(f"{{{NS['w']}}}val", "pt-BR")
+    # Cria run com texto formatado
+    r = ET.SubElement(p, f"{{{ns_w}}}r")
+    rPr = ET.SubElement(r, f"{{{ns_w}}}rPr")
     
-    t = ET.SubElement(r, f"{{{NS['w']}}}t")
-    t.text = texto
+    rFonts = ET.SubElement(rPr, f"{{{ns_w}}}rFonts")
+    rFonts.set(f"{{{ns_w}}}ascii", font_name)
+    rFonts.set(f"{{{ns_w}}}hAnsi", font_name)
+    rFonts.set(f"{{{ns_w}}}cs", font_name)
+    
+    sz = ET.SubElement(rPr, f"{{{ns_w}}}sz")
+    sz.set(f"{{{ns_w}}}val", str(size_half_points))
+    szCs = ET.SubElement(rPr, f"{{{ns_w}}}szCs")
+    szCs.set(f"{{{ns_w}}}val", str(size_half_points))
+    
+    if bold:
+        ET.SubElement(rPr, f"{{{ns_w}}}b")
+    if italic:
+        ET.SubElement(rPr, f"{{{ns_w}}}i")
+        
+    lang = ET.SubElement(rPr, f"{{{ns_w}}}lang")
+    lang.set(f"{{{ns_w}}}val", "pt-BR")
+    
+    t = ET.SubElement(r, f"{{{ns_w}}}t")
+    t.text = text
     t.set("{http://www.w3.org/XML/1998/namespace}space", "preserve")
-    return p
 
-def criar_tabela(dados_linhas):
-    tbl = ET.Element(f"{{{NS['w']}}}tbl")
-    tblPr = ET.SubElement(tbl, f"{{{NS['w']}}}tblPr")
-    tblStyle = ET.SubElement(tblPr, f"{{{NS['w']}}}tblStyle")
-    tblStyle.set(f"{{{NS['w']}}}val", "TableGrid")
-    tblW = ET.SubElement(tblPr, f"{{{NS['w']}}}tblW")
-    tblW.set(f"{{{NS['w']}}}w", "0")
-    tblW.set(f"{{{NS['w']}}}type", "auto")
-    jc = ET.SubElement(tblPr, f"{{{NS['w']}}}jc")
-    jc.set(f"{{{NS['w']}}}val", "center")
+def criar_tabela_formatada(dados_linhas):
+    ns_w = NS['w']
+    tbl = ET.Element(f"{{{ns_w}}}tbl")
+    tblPr = ET.SubElement(tbl, f"{{{ns_w}}}tblPr")
+    
+    tblStyle = ET.SubElement(tblPr, f"{{{ns_w}}}tblStyle")
+    tblStyle.set(f"{{{ns_w}}}val", "TableGrid")
+    
+    tblW = ET.SubElement(tblPr, f"{{{ns_w}}}tblW")
+    tblW.set(f"{{{ns_w}}}w", "0")
+    tblW.set(f"{{{ns_w}}}type", "auto")
+    
+    jc = ET.SubElement(tblPr, f"{{{ns_w}}}jc")
+    jc.set(f"{{{ns_w}}}val", "center")
     
     for r_idx, linha in enumerate(dados_linhas):
-        tr = ET.SubElement(tbl, f"{{{NS['w']}}}tr")
-        for celula in linha:
-            tc = ET.SubElement(tr, f"{{{NS['w']}}}tc")
-            tcPr = ET.SubElement(tc, f"{{{NS['w']}}}tcPr")
+        tr = ET.SubElement(tbl, f"{{{ns_w}}}tr")
+        trPr = ET.SubElement(tr, f"{{{ns_w}}}trPr")
+        
+        for c_idx, celula in enumerate(linha):
+            tc = ET.SubElement(tr, f"{{{ns_w}}}tc")
+            tcPr = ET.SubElement(tc, f"{{{ns_w}}}tcPr")
             
-            p = ET.SubElement(tc, f"{{{NS['w']}}}p")
-            pPr = ET.SubElement(p, f"{{{NS['w']}}}pPr")
-            pStyle = ET.SubElement(pPr, f"{{{NS['w']}}}pStyle")
-            pStyle.set(f"{{{NS['w']}}}val", "TAMainText")
-            pjc = ET.SubElement(pPr, f"{{{NS['w']}}}jc")
-            pjc.set(f"{{{NS['w']}}}val", "center" if r_idx > 0 else "center")
+            # Shading no cabeçalho da tabela (cinza claro harmônico com o modelo)
+            if r_idx == 0:
+                shd = ET.SubElement(tcPr, f"{{{ns_w}}}shd")
+                shd.set(f"{{{ns_w}}}val", "clear")
+                shd.set(f"{{{ns_w}}}color", "auto")
+                shd.set(f"{{{ns_w}}}fill", "EAEAEA")
+                
+            p = ET.SubElement(tc, f"{{{ns_w}}}p")
+            pPr = ET.SubElement(p, f"{{{ns_w}}}pPr")
+            pStyle = ET.SubElement(pPr, f"{{{ns_w}}}pStyle")
+            pStyle.set(f"{{{ns_w}}}val", "TAMainText")
             
-            r = ET.SubElement(p, f"{{{NS['w']}}}r")
-            rPr = ET.SubElement(r, f"{{{NS['w']}}}rPr")
-            rFonts = ET.SubElement(rPr, f"{{{NS['w']}}}rFonts")
-            rFonts.set(f"{{{NS['w']}}}ascii", "Arial")
-            rFonts.set(f"{{{NS['w']}}}hAnsi", "Arial")
+            pjc = ET.SubElement(pPr, f"{{{ns_w}}}jc")
+            pjc.set(f"{{{ns_w}}}val", "center" if c_idx > 0 or r_idx == 0 else "left")
             
-            sz = ET.SubElement(rPr, f"{{{NS['w']}}}sz")
-            sz.set(f"{{{NS['w']}}}val", "18" if r_idx > 0 else "18")  # 9pt
+            sp = ET.SubElement(pPr, f"{{{ns_w}}}spacing")
+            sp.set(f"{{{ns_w}}}after", "40")
+            sp.set(f"{{{ns_w}}}before", "40")
+            
+            r = ET.SubElement(p, f"{{{ns_w}}}r")
+            rPr = ET.SubElement(r, f"{{{ns_w}}}rPr")
+            
+            rFonts = ET.SubElement(rPr, f"{{{ns_w}}}rFonts")
+            rFonts.set(f"{{{ns_w}}}ascii", "Arial")
+            rFonts.set(f"{{{ns_w}}}hAnsi", "Arial")
+            
+            sz = ET.SubElement(rPr, f"{{{ns_w}}}sz")
+            sz.set(f"{{{ns_w}}}val", "18")  # 9pt para caber perfeitamente na tabela
+            szCs = ET.SubElement(rPr, f"{{{ns_w}}}szCs")
+            szCs.set(f"{{{ns_w}}}val", "18")
             
             if r_idx == 0:
-                ET.SubElement(rPr, f"{{{NS['w']}}}b")
+                ET.SubElement(rPr, f"{{{ns_w}}}b")
                 
-            t = ET.SubElement(r, f"{{{NS['w']}}}t")
+            t = ET.SubElement(r, f"{{{ns_w}}}t")
             t.text = str(celula)
             t.set("{http://www.w3.org/XML/1998/namespace}space", "preserve")
             
@@ -118,53 +147,76 @@ def gerar():
     root = tree.getroot()
     body = root.find('w:body', NS)
     
-    # Monta os novos filhos do corpo preservando cabeçalho, logo, seções e rodapés
-    novos_filhos = []
+    # Mapeamos os elementos originais exatamente
+    # body[0]: Tabela do cabeçalho institucional (UNIFOR e CCT)
+    # body[1], body[2]: Parágrafos em branco
+    # body[3]: Título
+    # body[4]: Autor 1
+    # body[5]: Autor 2
+    # body[6], body[7]: Parágrafos em branco
+    # body[8]: Palavras-chave
+    # body[9], body[10]: Parágrafos em branco
+    # body[11]: Cabeçalho "Resumo" (COM BORDA E CINZA D9D9D9)
+    # body[12]: Parágrafo em branco
+    # body[13]: Texto "Inserir o resumo..."
+    # body[14]: Parágrafo em branco
+    # body[15]: Cabeçalho "Introdução" (COM BORDA E CINZA D9D9D9)
+    # body[16]: Parágrafo em branco
+    # body[17]: Texto "Inserir a introdução..."
+    # body[18]: Parágrafo em branco
+    # body[19]: Cabeçalho "Metodologia" (COM BORDA E CINZA D9D9D9)
+    # body[20]: Parágrafo em branco
+    # body[21]: Texto "Inserir a metodologia..."
+    # body[22]: Cabeçalho "Resultados e Discussão" (COM BORDA E CINZA D9D9D9)
+    # body[23]: Parágrafo em branco
+    # body[24]: Texto "Inserir os resultados e a discussão..."
+    # body[25]: Cabeçalho "Conclusão" (COM BORDA E CINZA D9D9D9)
+    # body[26]: Parágrafo em branco
+    # body[27]: Texto "Inserir as conclusões..."
+    # body[28]: Cabeçalho "Referências" (COM BORDA E CINZA D9D9D9)
+    # body[29]: Parágrafo em branco
+    # body[30]: Texto "Inserir as referências bibliográficas..."
+    # body[31]: sectPr (Propriedades da página e margens)
     
-    # 0. Tabela de cabeçalho UNIFOR (logo e dados da instituição)
-    novos_filhos.append(body[0])
-    novos_filhos.append(body[1]) # p vazio
+    p_prototipo_corpo = copy.deepcopy(body[13]) # Template para parágrafos de texto (Arial 11, espaçamento 1.5)
+    p_prototipo_cabecalho = copy.deepcopy(body[28]) # Template para títulos de seção (Com borda e cinza D9D9D9)
     
-    # Título (Arial 14, Negrito, Caixa alta, Centralizado)
-    p_titulo = ET.Element(f"{{{NS['w']}}}p")
-    pPr_t = ET.SubElement(p_titulo, f"{{{NS['w']}}}pPr")
-    st_t = ET.SubElement(pPr_t, f"{{{NS['w']}}}pStyle")
-    st_t.set(f"{{{NS['w']}}}val", "TAMainText")
-    jc_t = ET.SubElement(pPr_t, f"{{{NS['w']}}}jc")
-    jc_t.set(f"{{{NS['w']}}}val", "center")
-    r_t = ET.SubElement(p_titulo, f"{{{NS['w']}}}r")
-    rPr_t = ET.SubElement(r_t, f"{{{NS['w']}}}rPr")
-    rf_t = ET.SubElement(rPr_t, f"{{{NS['w']}}}rFonts")
-    rf_t.set(f"{{{NS['w']}}}ascii", "Arial")
-    rf_t.set(f"{{{NS['w']}}}hAnsi", "Arial")
-    ET.SubElement(rPr_t, f"{{{NS['w']}}}b")
-    sz_t = ET.SubElement(rPr_t, f"{{{NS['w']}}}sz")
-    sz_t.set(f"{{{NS['w']}}}val", "28") # 14pt
-    t_t = ET.SubElement(r_t, f"{{{NS['w']}}}t")
-    t_t.text = "ANÁLISE DE DESEMPENHO DE ALGORITMOS DE ORDENAÇÃO EM AMBIENTES SERIAIS E CONCORRENTES/PARALELOS: UM ESTUDO COMPARATIVO EM JAVA"
-    novos_filhos.append(p_titulo)
+    novos_elementos = []
     
-    # Autores
-    novos_filhos.append(criar_paragrafo_texto("Autor 1: Anderson", alinhamento="left"))
-    novos_filhos.append(criar_paragrafo_texto("Curso: Ciência da Computação - Universidade de Fortaleza (UNIFOR)", alinhamento="left", italico=True))
-    novos_filhos.append(criar_paragrafo_texto("", espacamento=180))
+    # 0. Tabela de cabeçalho UNIFOR (INTACTA)
+    novos_elementos.append(body[0])
+    novos_elementos.append(body[1])
+    novos_elementos.append(body[2])
     
-    # Palavras-chave
-    novos_filhos.append(criar_paragrafo_texto("Palavras-chave: Computação Concorrente. Algoritmos de Ordenação. Speedup. Java Fork/Join. Desempenho.", estilo="NormalWeb", alinhamento="both"))
-    novos_filhos.append(criar_paragrafo_texto("", espacamento=180))
+    # 3. Título (Arial 14, Negrito, Caixa alta, Centralizado)
+    p_titulo = body[3]
+    set_paragraph_text(p_titulo, 
+                       "ANÁLISE DE DESEMPENHO DE ALGORITMOS DE ORDENAÇÃO EM AMBIENTES SERIAIS E CONCORRENTES/PARALELOS: UM ESTUDO COMPARATIVO EM JAVA",
+                       font_name="Arial", size_half_points="28", bold=True, line_spacing=240, align="center")
+    novos_elementos.append(p_titulo)
     
-    # RESUMO
-    p_h_resumo = ET.Element(f"{{{NS['w']}}}p")
-    pPr_hr = ET.SubElement(p_h_resumo, f"{{{NS['w']}}}pPr")
-    ET.SubElement(pPr_hr, f"{{{NS['w']}}}pStyle").set(f"{{{NS['w']}}}val", "Absbox")
-    r_hr = ET.SubElement(p_h_resumo, f"{{{NS['w']}}}r")
-    rPr_hr = ET.SubElement(r_hr, f"{{{NS['w']}}}rPr")
-    ET.SubElement(rPr_hr, f"{{{NS['w']}}}rFonts").set(f"{{{NS['w']}}}ascii", "Arial")
-    ET.SubElement(rPr_hr, f"{{{NS['w']}}}rFonts").set(f"{{{NS['w']}}}hAnsi", "Arial")
-    ET.SubElement(rPr_hr, f"{{{NS['w']}}}b")
-    ET.SubElement(r_hr, f"{{{NS['w']}}}t").text = "Resumo"
-    novos_filhos.append(p_h_resumo)
+    # 4. Autor
+    p_autor = body[4]
+    set_paragraph_text(p_autor, "Autor: Anderson Viana Cataldo", font_name="Arial", size_half_points="22", bold=False, line_spacing=240, align="left")
+    novos_elementos.append(p_autor)
     
+    # Autor 2 omitido já que é individual
+    novos_elementos.append(body[6])
+    novos_elementos.append(body[7])
+    
+    # 8. Palavras-chave
+    p_palavras = body[8]
+    set_paragraph_text(p_palavras, "Palavras-chave: Computação Concorrente. Algoritmos de Ordenação. Speedup. Java Fork/Join. Desempenho.",
+                       font_name="Arial", size_half_points="20", bold=False, line_spacing=240, align="both")
+    novos_elementos.append(p_palavras)
+    novos_elementos.append(body[9])
+    novos_elementos.append(body[10])
+    
+    # ================= RESUMO =================
+    novos_elementos.append(body[11]) # Cabeçalho ORIGINAL do modelo com borda e cinza
+    novos_elementos.append(body[12])
+    
+    p_resumo = body[13]
     texto_resumo = (
         "Este trabalho apresenta uma análise comparativa e aprofundada de desempenho entre implementações seriais e "
         "paralelas de quatro algoritmos fundamentais de ordenação em Java: Bubble Sort, Quick Sort, Merge Sort e Insertion Sort. "
@@ -178,21 +230,15 @@ def gerar():
         "Merge Sort Paralelo (speedup de 2,34x), evidenciando a eficácia da exploração de múltiplos núcleos de processamento, enquanto "
         "revelaram as limitações do overhead de sincronização no Bubble Sort em vetores de pequeno porte."
     )
-    novos_filhos.append(criar_paragrafo_texto(texto_resumo))
-    novos_filhos.append(criar_paragrafo_texto("", espacamento=180))
+    set_paragraph_text(p_resumo, texto_resumo, font_name="Arial", size_half_points="22", line_spacing=360, align="both")
+    novos_elementos.append(p_resumo)
+    novos_elementos.append(body[14])
     
-    # INTRODUÇÃO
-    p_h_intro = ET.Element(f"{{{NS['w']}}}p")
-    pPr_hi = ET.SubElement(p_h_intro, f"{{{NS['w']}}}pPr")
-    ET.SubElement(pPr_hi, f"{{{NS['w']}}}pStyle").set(f"{{{NS['w']}}}val", "Absbox")
-    r_hi = ET.SubElement(p_h_intro, f"{{{NS['w']}}}r")
-    rPr_hi = ET.SubElement(r_hi, f"{{{NS['w']}}}rPr")
-    ET.SubElement(rPr_hi, f"{{{NS['w']}}}rFonts").set(f"{{{NS['w']}}}ascii", "Arial")
-    ET.SubElement(rPr_hi, f"{{{NS['w']}}}rFonts").set(f"{{{NS['w']}}}hAnsi", "Arial")
-    ET.SubElement(rPr_hi, f"{{{NS['w']}}}b")
-    ET.SubElement(r_hi, f"{{{NS['w']}}}t").text = "Introdução"
-    novos_filhos.append(p_h_intro)
+    # ================= INTRODUÇÃO =================
+    novos_elementos.append(body[15]) # Cabeçalho ORIGINAL do modelo com borda e cinza
+    novos_elementos.append(body[16])
     
+    p_intro_1 = body[17]
     texto_intro_1 = (
         "A ordenação de conjuntos de dados é uma das operações computacionais mais frequentes e críticas na Ciência da Computação, "
         "servindo como alicerce para algoritmos de busca, indexação de bancos de dados e processamento analítico de grandes volumes de dados. "
@@ -201,6 +247,10 @@ def gerar():
         "arquiteturas multicore. Nesse cenário, o ganho real de velocidade em aplicações modernas tornou-se estritamente dependente da capacidade "
         "do software em explorar o paralelismo e a concorrência."
     )
+    set_paragraph_text(p_intro_1, texto_intro_1, font_name="Arial", size_half_points="22", line_spacing=360, align="both")
+    novos_elementos.append(p_intro_1)
+    
+    p_intro_2 = copy.deepcopy(p_prototipo_corpo)
     texto_intro_2 = (
         "O presente trabalho aborda a implementação e avaliação de desempenho de quatro algoritmos de ordenação em Java: "
         "dois de complexidade assintótica quadrática O(n²) — Bubble Sort e Insertion Sort — e dois de complexidade quase-linear O(n log n) — "
@@ -210,28 +260,23 @@ def gerar():
         "ambiente em Java padrão (SE 25), sem dependências externas, dotado de interface gráfica nativa em Swing para renderização de "
         "gráficos dinâmicos e registro sistemático dos resultados em arquivos CSV."
     )
-    novos_filhos.append(criar_paragrafo_texto(texto_intro_1))
-    novos_filhos.append(criar_paragrafo_texto(texto_intro_2))
-    novos_filhos.append(criar_paragrafo_texto("", espacamento=180))
+    set_paragraph_text(p_intro_2, texto_intro_2, font_name="Arial", size_half_points="22", line_spacing=360, align="both")
+    novos_elementos.append(p_intro_2)
+    novos_elementos.append(body[18])
     
-    # METODOLOGIA
-    p_h_met = ET.Element(f"{{{NS['w']}}}p")
-    pPr_hm = ET.SubElement(p_h_met, f"{{{NS['w']}}}pPr")
-    ET.SubElement(pPr_hm, f"{{{NS['w']}}}pStyle").set(f"{{{NS['w']}}}val", "Absbox")
-    r_hm = ET.SubElement(p_h_met, f"{{{NS['w']}}}r")
-    rPr_hm = ET.SubElement(r_hm, f"{{{NS['w']}}}rPr")
-    ET.SubElement(rPr_hm, f"{{{NS['w']}}}rFonts").set(f"{{{NS['w']}}}ascii", "Arial")
-    ET.SubElement(rPr_hm, f"{{{NS['w']}}}rFonts").set(f"{{{NS['w']}}}hAnsi", "Arial")
-    ET.SubElement(rPr_hm, f"{{{NS['w']}}}b")
-    ET.SubElement(r_hm, f"{{{NS['w']}}}t").text = "Metodologia"
-    novos_filhos.append(p_h_met)
+    # ================= METODOLOGIA =================
+    novos_elementos.append(body[19]) # Cabeçalho ORIGINAL do modelo com borda e cinza
+    novos_elementos.append(body[20])
     
+    p_met_1 = body[21]
     texto_met_1 = (
         "A metodologia empregada fundamentou-se na implementação rigorosa dos algoritmos tanto em modelo serial quanto paralelo, "
         "adotando estruturas concorrentes bem estabelecidas na literatura acadêmica:"
     )
-    novos_filhos.append(criar_paragrafo_texto(texto_met_1))
+    set_paragraph_text(p_met_1, texto_met_1, font_name="Arial", size_half_points="22", line_spacing=360, align="both")
+    novos_elementos.append(p_met_1)
     
+    p_met_algos = copy.deepcopy(p_prototipo_corpo)
     texto_met_algos = (
         "1. Bubble Sort: A versão serial utiliza o laço duplo padrão com interrupção antecipada via flag booleana. A versão paralela adota o "
         "algoritmo de Transposição Par-Ímpar (Odd-Even Transposition Sort), particionando os pares disjuntos de índices (j, j+1) entre as threads "
@@ -244,8 +289,10 @@ def gerar():
         "4. Quick Sort: A implementação utiliza o esquema de particionamento de Hoare com escolha de pivô por mediana de três (início, meio e fim). "
         "Na versão paralela, as duas partições resultantes são submetidas concorrentemente ao ForkJoinPool."
     )
-    novos_filhos.append(criar_paragrafo_texto(texto_met_algos))
+    set_paragraph_text(p_met_algos, texto_met_algos, font_name="Arial", size_half_points="22", line_spacing=360, align="both")
+    novos_elementos.append(p_met_algos)
     
+    p_met_2 = copy.deepcopy(p_prototipo_corpo)
     texto_met_2 = (
         "O protocolo de teste foi conduzido em ambiente operacional Windows 11 com processador Intel(R) Core(TM) i5-10210U (4 núcleos físicos, "
         "8 processadores lógicos) sob OpenJDK 25 LTS. Foram avaliados tamanhos de entrada N = 1.000, 5.000 e 10.000 elementos nas naturezas Aleatória "
@@ -254,26 +301,20 @@ def gerar():
         "System.nanoTime(), permitindo apurar a média aritmética e o desvio padrão amostral. A integridade da ordenação foi verificada ao término de cada "
         "amostra. As métricas de Speedup (S = T_serial / T_paralelo) e Eficiência (E = S / P) foram consolidadas automaticamente."
     )
-    novos_filhos.append(criar_paragrafo_texto(texto_met_2))
-    novos_filhos.append(criar_paragrafo_texto("", espacamento=180))
+    set_paragraph_text(p_met_2, texto_met_2, font_name="Arial", size_half_points="22", line_spacing=360, align="both")
+    novos_elementos.append(p_met_2)
     
-    # RESULTADOS E DISCUSSÃO
-    p_h_res = ET.Element(f"{{{NS['w']}}}p")
-    pPr_hrs = ET.SubElement(p_h_res, f"{{{NS['w']}}}pPr")
-    ET.SubElement(pPr_hrs, f"{{{NS['w']}}}pStyle").set(f"{{{NS['w']}}}val", "Absbox")
-    r_hrs = ET.SubElement(p_h_res, f"{{{NS['w']}}}r")
-    rPr_hrs = ET.SubElement(r_hrs, f"{{{NS['w']}}}rPr")
-    ET.SubElement(rPr_hrs, f"{{{NS['w']}}}rFonts").set(f"{{{NS['w']}}}ascii", "Arial")
-    ET.SubElement(rPr_hrs, f"{{{NS['w']}}}rFonts").set(f"{{{NS['w']}}}hAnsi", "Arial")
-    ET.SubElement(rPr_hrs, f"{{{NS['w']}}}b")
-    ET.SubElement(r_hrs, f"{{{NS['w']}}}t").text = "Resultados e Discussão"
-    novos_filhos.append(p_h_res)
+    # ================= RESULTADOS E DISCUSSÃO =================
+    novos_elementos.append(body[22]) # Cabeçalho ORIGINAL do modelo com borda e cinza
+    novos_elementos.append(body[23])
     
+    p_res_1 = body[24]
     texto_res_1 = (
         "A Tabela 1 sintetiza as médias de tempo de execução (em milissegundos) e os respectivos fatores de Speedup obtidos para os "
         "quatro algoritmos analisados, considerando os vetores aleatórios e inversamente ordenados sob 1, 2 e 4 threads:"
     )
-    novos_filhos.append(criar_paragrafo_texto(texto_res_1))
+    set_paragraph_text(p_res_1, texto_res_1, font_name="Arial", size_half_points="22", line_spacing=360, align="both")
+    novos_elementos.append(p_res_1)
     
     # Tabela com resultados reais
     tabela_dados = [
@@ -291,10 +332,13 @@ def gerar():
         ["Quick Sort", "Paralelo (2 Threads)", "0,251 ms", "0,776 ms", "1,46x", "0,316 ms", "0,48x"],
         ["Quick Sort", "Paralelo (4 Threads)", "0,189 ms", "0,815 ms", "1,39x", "0,399 ms", "0,38x"]
     ]
-    novos_filhos.append(criar_tabela(tabela_dados))
-    novos_filhos.append(criar_paragrafo_texto("Tabela 1: Comparativo de tempos médios e Speedup dos algoritmos sob 5 amostras.", estilo="TAMainText", italico=True, alinhamento="center"))
-    novos_filhos.append(criar_paragrafo_texto("", espacamento=180))
+    novos_elementos.append(criar_tabela_formatada(tabela_dados))
     
+    p_legenda_tab = copy.deepcopy(p_prototipo_corpo)
+    set_paragraph_text(p_legenda_tab, "Tabela 1: Comparativo de tempos médios e Speedup dos algoritmos sob 5 amostras.", font_name="Arial", size_half_points="18", italic=True, align="center")
+    novos_elementos.append(p_legenda_tab)
+    
+    p_disc_1 = copy.deepcopy(p_prototipo_corpo)
     texto_disc_1 = (
         "A análise dos resultados empíricos evidencia nuances fundamentais da computação concorrente. O caso mais notável de ganho de desempenho "
         "ocorreu no Insertion Sort Paralelo. Para N = 10.000 com dados inversamente ordenados (pior cenário teórico), o tempo serial de 56,901 ms foi "
@@ -302,34 +346,33 @@ def gerar():
         "do vetor em P blocos de tamanho N/P reduz o número total de comparações quadráticas de O(N²) para P * O((N/P)²) = O(N²/P), viabilizando uma redução "
         "algébrica de trabalho além da pura distribuição física de núcleos."
     )
+    set_paragraph_text(p_disc_1, texto_disc_1, font_name="Arial", size_half_points="22", line_spacing=360, align="both")
+    novos_elementos.append(p_disc_1)
+    
+    p_disc_2 = copy.deepcopy(p_prototipo_corpo)
     texto_disc_2 = (
         "Por sua vez, o Merge Sort Paralelo demonstrou escalabilidade consistente: em vetores inversos de 10.000 elementos, o tempo serial de 1,283 ms "
         "caiu para 0,548 ms sob 4 threads (Speedup de 2,34x e eficiência de 58,5%). Em contrapartida, para tamanhos pequenos (N = 1.000), o custo de instanciação "
         "das tarefas Fork/Join superou o ganho computacional da ordenação, fenômeno clássico conhecido como overhead de granularidade fina."
     )
+    set_paragraph_text(p_disc_2, texto_disc_2, font_name="Arial", size_half_points="22", line_spacing=360, align="both")
+    novos_elementos.append(p_disc_2)
+    
+    p_disc_3 = copy.deepcopy(p_prototipo_corpo)
     texto_disc_3 = (
         "No Bubble Sort Paralelo (Odd-Even Transposition), observou-se uma aceleração negativa (Speedup inferior a 1,0x). Embora o particionamento de pares "
         "seja matematicamente correto e livre de corridas, a exigência de sincronização global via barreira cíclica ao término de cada fase gerou contenção "
         "substancial e latência de troca de contexto entre as threads. Esse resultado comprova que algoritmos com alto acoplamento e dependência mútua de passos "
         "não se beneficiam de paralelização em memórias compartilhadas para conjuntos de dados que caibam inteiramente no cache L1/L2 do processador."
     )
-    novos_filhos.append(criar_paragrafo_texto(texto_disc_1))
-    novos_filhos.append(criar_paragrafo_texto(texto_disc_2))
-    novos_filhos.append(criar_paragrafo_texto(texto_disc_3))
-    novos_filhos.append(criar_paragrafo_texto("", espacamento=180))
+    set_paragraph_text(p_disc_3, texto_disc_3, font_name="Arial", size_half_points="22", line_spacing=360, align="both")
+    novos_elementos.append(p_disc_3)
     
-    # CONCLUSÃO
-    p_h_concl = ET.Element(f"{{{NS['w']}}}p")
-    pPr_hc = ET.SubElement(p_h_concl, f"{{{NS['w']}}}pPr")
-    ET.SubElement(pPr_hc, f"{{{NS['w']}}}pStyle").set(f"{{{NS['w']}}}val", "Absbox")
-    r_hc = ET.SubElement(p_h_concl, f"{{{NS['w']}}}r")
-    rPr_hc = ET.SubElement(r_hc, f"{{{NS['w']}}}rPr")
-    ET.SubElement(rPr_hc, f"{{{NS['w']}}}rFonts").set(f"{{{NS['w']}}}ascii", "Arial")
-    ET.SubElement(rPr_hc, f"{{{NS['w']}}}rFonts").set(f"{{{NS['w']}}}hAnsi", "Arial")
-    ET.SubElement(rPr_hc, f"{{{NS['w']}}}b")
-    ET.SubElement(r_hc, f"{{{NS['w']}}}t").text = "Conclusão"
-    novos_filhos.append(p_h_concl)
+    # ================= CONCLUSÃO =================
+    novos_elementos.append(body[25]) # Cabeçalho ORIGINAL do modelo com borda e cinza
+    novos_elementos.append(body[26])
     
+    p_concl = body[27]
     texto_concl = (
         "O estudo comparativo atingiu plenamente seus objetivos ao evidenciar as condições práticas sob as quais a paralelização de algoritmos de ordenação "
         "é vantajosa. Constatou-se que a aceleração não decorre unicamente da adição de threads, mas sim da relação entre a complexidade intrínseca da tarefa, "
@@ -339,20 +382,12 @@ def gerar():
         "paralelos com redes de interconexão dedicadas. O framework desenvolvido e os arquivos CSV gerados fornecem uma base sólida e reproduzível para futuras "
         "pesquisas em computação de alto desempenho."
     )
-    novos_filhos.append(criar_paragrafo_texto(texto_concl))
-    novos_filhos.append(criar_paragrafo_texto("", espacamento=180))
+    set_paragraph_text(p_concl, texto_concl, font_name="Arial", size_half_points="22", line_spacing=360, align="both")
+    novos_elementos.append(p_concl)
     
-    # REFERÊNCIAS
-    p_h_ref = ET.Element(f"{{{NS['w']}}}p")
-    pPr_hrf = ET.SubElement(p_h_ref, f"{{{NS['w']}}}pPr")
-    ET.SubElement(pPr_hrf, f"{{{NS['w']}}}pStyle").set(f"{{{NS['w']}}}val", "Absbox")
-    r_hrf = ET.SubElement(p_h_ref, f"{{{NS['w']}}}r")
-    rPr_hrf = ET.SubElement(r_hrf, f"{{{NS['w']}}}rPr")
-    ET.SubElement(rPr_hrf, f"{{{NS['w']}}}rFonts").set(f"{{{NS['w']}}}ascii", "Arial")
-    ET.SubElement(rPr_hrf, f"{{{NS['w']}}}rFonts").set(f"{{{NS['w']}}}hAnsi", "Arial")
-    ET.SubElement(rPr_hrf, f"{{{NS['w']}}}b")
-    ET.SubElement(r_hrf, f"{{{NS['w']}}}t").text = "Referências"
-    novos_filhos.append(p_h_ref)
+    # ================= REFERÊNCIAS =================
+    novos_elementos.append(body[28]) # Cabeçalho ORIGINAL do modelo com borda e cinza
+    novos_elementos.append(body[29])
     
     refs = [
         "CORMEN, T. H.; LEISERSON, C. E.; RIVEST, R. L.; STEIN, C. Algoritmos: Teoria e Prática. 3. ed. Rio de Janeiro: Elsevier, 2012.",
@@ -360,43 +395,49 @@ def gerar():
         "LEA, D. A Java Fork/Join Framework. In: ACM JAVA GRANDE CONFERENCE, 2000, San Francisco. Proceedings [...]. New York: ACM, 2000. p. 36-43.",
         "WILKINSON, B.; ALLEN, M. Parallel Programming: Techniques and Applications Using Networked Workstations and Parallel Computers. 2. ed. Upper Saddle River: Prentice Hall, 2005."
     ]
-    for r in refs:
-        novos_filhos.append(criar_paragrafo_texto(r, espacamento=240))
+    p_ref_first = body[30]
+    set_paragraph_text(p_ref_first, refs[0], font_name="Arial", size_half_points="22", line_spacing=240, align="both")
+    novos_elementos.append(p_ref_first)
+    
+    for r_text in refs[1:]:
+        p_ref = copy.deepcopy(p_prototipo_corpo)
+        set_paragraph_text(p_ref, r_text, font_name="Arial", size_half_points="22", line_spacing=240, align="both")
+        novos_elementos.append(p_ref)
         
-    novos_filhos.append(criar_paragrafo_texto("", espacamento=180))
+    novos_elementos.append(copy.deepcopy(body[12])) # Parágrafo em branco
     
-    # ANEXOS
-    p_h_anex = ET.Element(f"{{{NS['w']}}}p")
-    pPr_ha = ET.SubElement(p_h_anex, f"{{{NS['w']}}}pPr")
-    ET.SubElement(pPr_ha, f"{{{NS['w']}}}pStyle").set(f"{{{NS['w']}}}val", "Absbox")
-    r_ha = ET.SubElement(p_h_anex, f"{{{NS['w']}}}r")
-    rPr_ha = ET.SubElement(r_ha, f"{{{NS['w']}}}rPr")
-    ET.SubElement(rPr_ha, f"{{{NS['w']}}}rFonts").set(f"{{{NS['w']}}}ascii", "Arial")
-    ET.SubElement(rPr_ha, f"{{{NS['w']}}}rFonts").set(f"{{{NS['w']}}}hAnsi", "Arial")
-    ET.SubElement(rPr_ha, f"{{{NS['w']}}}b")
-    ET.SubElement(r_ha, f"{{{NS['w']}}}t").text = "Anexos – Códigos das Implementações"
-    novos_filhos.append(p_h_anex)
+    # ================= ANEXOS =================
+    # Usamos uma cópia do cabeçalho de Referências para ter exatamente a mesma borda e fundo cinza D9D9D9!
+    p_h_anexos = copy.deepcopy(p_prototipo_cabecalho)
+    # Altera o texto do run
+    t_anex = p_h_anexos.find(f".//{{{NS['w']}}}t")
+    if t_anex is not None:
+        t_anex.text = "Anexos – Códigos das Implementações"
+    novos_elementos.append(p_h_anexos)
+    novos_elementos.append(copy.deepcopy(body[12]))
     
+    p_anexos_texto = copy.deepcopy(p_prototipo_corpo)
     texto_anexos = (
-        "O código-fonte integral do projeto, os scripts facilitadores de compilação e os conjuntos completos de dados "
-        "gerados em formato CSV encontram-se disponíveis no repositório GitHub:\n"
-        "Repositório GitHub: [Inserir o link do seu GitHub aqui]\n"
-        "Instruções para execução: Execute o script 'executar_gui.bat' no Windows para inicializar a interface gráfica Swing, "
-        "ou execute 'executar_cli.bat' para reproduzir as medições diretamente via terminal."
+        "O código-fonte integral do projeto, os scripts facilitadores de compilação, a interface gráfica Swing e os "
+        "conjuntos completos de dados gerados em formato CSV encontram-se disponíveis no repositório GitHub:\n\n"
+        "Repositório GitHub: https://github.com/andersoncataldo/algoritmos-desempenho-paralelo-concorrente.git\n\n"
+        "Instruções para execução:\n"
+        "1. Execute o script 'executar_gui.bat' no Windows para inicializar a interface gráfica Swing com gráficos dinâmicos;\n"
+        "2. Ou execute 'executar_cli.bat' para reproduzir os benchmarks diretamente via terminal headless."
     )
-    novos_filhos.append(criar_paragrafo_texto(texto_anexos))
+    set_paragraph_text(p_anexos_texto, texto_anexos, font_name="Arial", size_half_points="22", line_spacing=360, align="both")
+    novos_elementos.append(p_anexos_texto)
     
-    # Adiciona a seção final original (margens, tamanho de página)
-    novos_filhos.append(body[-1])
+    # Propriedades de página e margens originais (INTACTAS)
+    novos_elementos.append(body[31])
     
-    # Substitui os filhos do body
+    # Substitui no corpo
     body.clear()
-    for f in novos_filhos:
-        body.append(f)
+    for el in novos_elementos:
+        body.append(el)
         
     tree.write(doc_path, encoding='utf-8', xml_declaration=True)
     
-    # Empacota novamente como docx
     with zipfile.ZipFile(OUTPUT_PATH, 'w', zipfile.ZIP_DEFLATED) as zout:
         for foldername, subfolders, filenames in os.walk(temp_dir):
             for filename in filenames:
@@ -405,7 +446,7 @@ def gerar():
                 zout.write(filepath, arcname)
                 
     shutil.rmtree(temp_dir)
-    print(f"Relatório gerado com sucesso em: {OUTPUT_PATH}")
+    print("Sucesso! Relatório gerado com fidelidade absoluta ao Modelo-Artigo.docx.")
 
 if __name__ == "__main__":
     gerar()
