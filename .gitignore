@@ -1,2 +1,7 @@
-# arquivos de saída do sistema
+# Arquivos de saida e dados gerados
 *.csv
+output/
+
+# Bytecode compilado Java
+bin/
+*.class
