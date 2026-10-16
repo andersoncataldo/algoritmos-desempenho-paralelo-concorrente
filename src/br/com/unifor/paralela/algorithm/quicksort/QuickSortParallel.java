@@ -7,16 +7,17 @@ import java.util.concurrent.RecursiveAction;
 
 /**
  * Implementação paralela do Quick Sort utilizando ForkJoinPool.
- * Após o particionamento, os dois subvetores são processados concorrentemente por threads distintas.
- * Para partições menores que o limiar (threshold), a execução recorre ao QuickSort serial para
- * manter o overhead de sincronização mínimo.
+ * Reutiliza a instância do ForkJoinPool e utiliza limiar adaptativo
+ * para delegar partições menores ao QuickSort serial com Insertion Sort.
  */
 public class QuickSortParallel implements Sorter {
 
     private final int numThreads;
+    private final ForkJoinPool pool;
 
     public QuickSortParallel(int numThreads) {
         this.numThreads = Math.max(1, numThreads);
+        this.pool = new ForkJoinPool(this.numThreads);
     }
 
     @Override
@@ -45,14 +46,8 @@ public class QuickSortParallel implements Sorter {
             return;
         }
 
-        int threshold = Math.max(1024, array.length / (numThreads * 4));
-
-        ForkJoinPool pool = new ForkJoinPool(numThreads);
-        try {
-            pool.invoke(new QuickSortTask(array, 0, array.length - 1, threshold));
-        } finally {
-            pool.shutdown();
-        }
+        int threshold = Math.max(QuickSortSerial.INSERTION_THRESHOLD, array.length / (numThreads * 4));
+        pool.invoke(new QuickSortTask(array, 0, array.length - 1, threshold));
     }
 
     private static class QuickSortTask extends RecursiveAction {

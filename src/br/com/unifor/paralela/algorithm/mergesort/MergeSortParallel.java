@@ -6,17 +6,19 @@ import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.RecursiveAction;
 
 /**
- * Implementação paralela do Merge Sort utilizando o framework Fork/Join do Java.
- * A árvore de recursão é dividida em subtarefas executadas em paralelo pelo ForkJoinPool.
- * Quando o subvetor atinge um limiar mínimo, a execução comuta para a versão serial
- * para evitar sobrecarga excessiva de agendamento de tarefas pequenas.
+ * Implementação paralela otimizada do Merge Sort com ForkJoinPool.
+ * - Utiliza threshold balanceado por thread para equilibrar paralelismo e custo de agendamento.
+ * - Incorpora atalho de mescla (se o maior elemento à esquerda for <= menor à direita, pula a mescla).
+ * - Utiliza vetor auxiliar único alocado no início para eliminar alocações intermediárias.
  */
 public class MergeSortParallel implements Sorter {
 
     private final int numThreads;
+    private final ForkJoinPool pool;
 
     public MergeSortParallel(int numThreads) {
         this.numThreads = Math.max(1, numThreads);
+        this.pool = new ForkJoinPool(this.numThreads);
     }
 
     @Override
@@ -46,14 +48,9 @@ public class MergeSortParallel implements Sorter {
         }
 
         int[] aux = new int[array.length];
-        int threshold = Math.max(1024, array.length / (numThreads * 4));
+        int threshold = Math.max(MergeSortSerial.INSERTION_THRESHOLD, array.length / (numThreads * 4));
 
-        ForkJoinPool pool = new ForkJoinPool(numThreads);
-        try {
-            pool.invoke(new MergeSortTask(array, aux, 0, array.length - 1, threshold));
-        } finally {
-            pool.shutdown();
-        }
+        pool.invoke(new MergeSortTask(array, aux, 0, array.length - 1, threshold));
     }
 
     private static class MergeSortTask extends RecursiveAction {
@@ -83,6 +80,12 @@ public class MergeSortParallel implements Sorter {
             MergeSortTask tarefaDireita = new MergeSortTask(array, aux, meio + 1, direita, threshold);
 
             invokeAll(tarefaEsquerda, tarefaDireita);
+
+            // Otimização: se os blocos já estiverem em ordem, não precisa mesclar
+            if (array[meio] <= array[meio + 1]) {
+                return;
+            }
+
             MergeSortSerial.merge(array, aux, esquerda, meio, direita);
         }
     }

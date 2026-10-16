@@ -1,14 +1,17 @@
 package br.com.unifor.paralela.algorithm.quicksort;
 
 import br.com.unifor.paralela.algorithm.Sorter;
+import br.com.unifor.paralela.algorithm.insertionsort.InsertionSortSerial;
 
 /**
- * Implementação serial do Quick Sort.
- * Utiliza a estratégia de pivô por mediana de três (início, meio e fim)
- * e particionamento de Hoare para máxima eficiência e proteção contra
- * degeneração em vetores já ordenados ou inversos.
+ * Implementação serial do Quick Sort altamente otimizada:
+ * - Pivô por mediana de três (início, meio e fim) para evitar pior caso O(n²).
+ * - Chaveamento para Insertion Sort em partições menores que 32 elementos (mesma técnica do DualPivotQuicksort do Java).
+ * - Eliminação de recursão em cauda (tail-call elimination) para reduzir a pilha de execução.
  */
 public class QuickSortSerial implements Sorter {
+
+    public static final int INSERTION_THRESHOLD = 32;
 
     @Override
     public String getName() {
@@ -34,20 +37,32 @@ public class QuickSortSerial implements Sorter {
     }
 
     public static void quickSort(int[] array, int esquerda, int direita) {
-        if (esquerda < direita) {
+        while (esquerda < direita) {
+            // Se o subvetor for pequeno, usa Insertion Sort
+            if (direita - esquerda < INSERTION_THRESHOLD) {
+                InsertionSortSerial.sortRange(array, esquerda, direita + 1);
+                return;
+            }
+
             int indicePivo = particionar(array, esquerda, direita);
-            quickSort(array, esquerda, indicePivo);
-            quickSort(array, indicePivo + 1, direita);
+
+            // Otimização de cauda: executa recursão na menor partição primeiro e itera na maior
+            if (indicePivo - esquerda < direita - indicePivo) {
+                quickSort(array, esquerda, indicePivo);
+                esquerda = indicePivo + 1;
+            } else {
+                quickSort(array, indicePivo + 1, direita);
+                direita = indicePivo;
+            }
         }
     }
 
     /**
-     * Particionamento baseado no esquema de Hoare com pivô mediana de três.
+     * Particionamento de Hoare com escolha de pivô por mediana de três.
      */
     public static int particionar(int[] array, int esquerda, int direita) {
         int meio = esquerda + (direita - esquerda) / 2;
 
-        // Mediana de três: ordena esquerda, meio e direita para escolher o pivô
         if (array[esquerda] > array[meio]) {
             trocar(array, esquerda, meio);
         }

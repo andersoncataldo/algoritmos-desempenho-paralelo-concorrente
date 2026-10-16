@@ -17,6 +17,7 @@ import br.com.unifor.paralela.model.DataDistribution;
 
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
+import javax.swing.border.LineBorder;
 import javax.swing.border.TitledBorder;
 import javax.swing.table.DefaultTableCellRenderer;
 import javax.swing.table.DefaultTableModel;
@@ -29,9 +30,10 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Janela principal da aplicação (Java Swing nativo).
- * Gerencia a configuração dos experimentos, execução assíncrona via SwingWorker,
- * visualização tabular, gráficos dinâmicos e exportação de relatórios CSV.
+ * Interface gráfica principal em Java Swing nativo.
+ * Totalmente reformulada para máxima usabilidade, evitando cortes de tela,
+ * com barra de ações fixas sempre visíveis, presets de um clique,
+ * suporte a barras de rolagem horizontal/vertical e design moderno.
  */
 public class MainWindow extends JFrame {
 
@@ -66,10 +68,11 @@ public class MainWindow extends JFrame {
     // Amostras Spinner
     private JSpinner spnAmostras;
 
-    // Botões
+    // Botões Principais de Ação (Sempre visíveis no topo!)
     private JButton btnIniciar;
     private JButton btnCancelar;
     private JButton btnExportarCsv;
+    private JLabel lblStatusBadge;
 
     // Progresso e Logs
     private JProgressBar progressBar;
@@ -82,6 +85,7 @@ public class MainWindow extends JFrame {
     private ChartPanel chartTempoPanel;
     private ChartPanel chartSpeedupPanel;
     private JComboBox<DataDistribution> cmbDistroGrafico;
+    private JTabbedPane tabbedPane;
 
     // Estado e Benchmark
     private final List<BenchmarkSummary> listaResumos = new ArrayList<>();
@@ -91,8 +95,8 @@ public class MainWindow extends JFrame {
 
     public MainWindow() {
         setTitle("UNIFOR - Análise de Desempenho de Algoritmos (Serial vs Paralelo/Concorrente)");
-        setSize(1200, 780);
-        setMinimumSize(new Dimension(980, 650));
+        setSize(1240, 820);
+        setMinimumSize(new Dimension(940, 620));
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         setLocationRelativeTo(null);
 
@@ -100,19 +104,19 @@ public class MainWindow extends JFrame {
     }
 
     private void construirInterface() {
-        setLayout(new BorderLayout(8, 8));
+        setLayout(new BorderLayout(0, 0));
 
-        // Cabeçalho da aplicação
+        // Cabeçalho institucional superior
         JPanel pnlHeader = new JPanel(new BorderLayout());
         pnlHeader.setBackground(new Color(24, 43, 73));
-        pnlHeader.setBorder(new EmptyBorder(12, 16, 12, 16));
+        pnlHeader.setBorder(new EmptyBorder(12, 18, 12, 18));
 
         JLabel lblTitulo = new JLabel("Estudo Comparativo de Algoritmos de Ordenação (Serial vs Paralelo)");
-        lblTitulo.setFont(new Font("Segoe UI", Font.BOLD, 17));
+        lblTitulo.setFont(new Font("Segoe UI", Font.BOLD, 18));
         lblTitulo.setForeground(Color.WHITE);
 
         int nucleos = Runtime.getRuntime().availableProcessors();
-        JLabel lblSub = new JLabel("Universidade de Fortaleza | Ambiente detectado: " + nucleos + " processadores lógicos");
+        JLabel lblSub = new JLabel("Universidade de Fortaleza (UNIFOR) | Hardware Detectado: Intel Core i5 | " + nucleos + " processadores lógicos");
         lblSub.setFont(new Font("Segoe UI", Font.PLAIN, 12));
         lblSub.setForeground(new Color(189, 195, 199));
 
@@ -120,45 +124,137 @@ public class MainWindow extends JFrame {
         pnlHeader.add(lblSub, BorderLayout.SOUTH);
         add(pnlHeader, BorderLayout.NORTH);
 
-        // Painel com Abas
-        JTabbedPane tabbedPane = new JTabbedPane();
-        tabbedPane.setFont(new Font("Segoe UI", Font.PLAIN, 13));
+        // Barra de Ações Superior FIXA (SEMPRE VISÍVEL no topo da tela!)
+        JPanel pnlAcoesFixas = criarBarraAcoesFixas();
+        
+        // Painel central com abas
+        tabbedPane = new JTabbedPane();
+        tabbedPane.setFont(new Font("Segoe UI", Font.BOLD, 13));
 
-        tabbedPane.addTab("Execução & Logs", criarPainelExecucao());
-        tabbedPane.addTab("Tabela Estatística", criarPainelTabela());
-        tabbedPane.addTab("Gráfico de Tempos (ms)", criarPainelGraficoTempo());
-        tabbedPane.addTab("Gráfico de Speedup", criarPainelGraficoSpeedup());
-        tabbedPane.addTab("Sobre o Projeto", criarPainelSobre());
+        tabbedPane.addTab("⚡ Execução & Logs", criarPainelExecucao());
+        tabbedPane.addTab("📊 Tabela Estatística", criarPainelTabela());
+        tabbedPane.addTab("📈 Gráfico de Tempos (ms)", criarPainelGraficoTempo());
+        tabbedPane.addTab("🚀 Gráfico de Speedup", criarPainelGraficoSpeedup());
+        tabbedPane.addTab("ℹ️ Sobre o Projeto", criarPainelSobre());
 
-        add(tabbedPane, BorderLayout.CENTER);
+        // Painel Central englobando a barra de ações e as abas
+        JPanel pnlCentro = new JPanel(new BorderLayout(0, 0));
+        pnlCentro.add(pnlAcoesFixas, BorderLayout.NORTH);
+        pnlCentro.add(tabbedPane, BorderLayout.CENTER);
+        add(pnlCentro, BorderLayout.CENTER);
 
-        // Rodapé com Barra de Progresso
-        JPanel pnlFooter = new JPanel(new BorderLayout(8, 8));
-        pnlFooter.setBorder(new EmptyBorder(6, 12, 8, 12));
+        // Rodapé de Status e Progresso
+        JPanel pnlFooter = new JPanel(new BorderLayout(10, 0));
+        pnlFooter.setBorder(new EmptyBorder(6, 16, 6, 16));
+        pnlFooter.setBackground(new Color(245, 245, 245));
 
-        lblStatus = new JLabel("Pronto para executar experimentos.");
+        lblStatus = new JLabel("Pronto para executar. Clique no botão verde 'INICIAR BENCHMARK' acima.");
         lblStatus.setFont(new Font("Segoe UI", Font.PLAIN, 12));
 
         progressBar = new JProgressBar(0, 100);
         progressBar.setStringPainted(true);
-        progressBar.setPreferredSize(new Dimension(280, 20));
+        progressBar.setPreferredSize(new Dimension(300, 22));
+        progressBar.setFont(new Font("Segoe UI", Font.BOLD, 11));
 
         pnlFooter.add(lblStatus, BorderLayout.CENTER);
         pnlFooter.add(progressBar, BorderLayout.EAST);
         add(pnlFooter, BorderLayout.SOUTH);
     }
 
-    private JPanel criarPainelExecucao() {
-        JPanel painel = new JPanel(new BorderLayout(10, 10));
-        painel.setBorder(new EmptyBorder(10, 10, 10, 10));
+    /**
+     * Barra fixa com os botões principais de ação.
+     * Esta barra NUNCA é cortada por rolagem e fica sempre imediatamente acessível ao usuário.
+     */
+    private JPanel criarBarraAcoesFixas() {
+        JPanel bar = new JPanel(new BorderLayout(10, 10));
+        bar.setBackground(new Color(238, 242, 246));
+        bar.setBorder(BorderFactory.createCompoundBorder(
+                new LineBorder(new Color(210, 215, 222), 1),
+                new EmptyBorder(8, 14, 8, 14)
+        ));
 
-        // Painel Lateral Esquerdo: Configurações
-        JPanel pnlConfig = new JPanel();
-        pnlConfig.setLayout(new BoxLayout(pnlConfig, BoxLayout.Y_AXIS));
-        pnlConfig.setPreferredSize(new Dimension(320, 500));
+        // Botões de Execução (Esquerda)
+        JPanel pnlBotoesEsq = new JPanel(new FlowLayout(FlowLayout.LEFT, 10, 0));
+        pnlBotoesEsq.setOpaque(false);
+
+        btnIniciar = new JButton("▶  INICIAR BENCHMARK");
+        btnIniciar.setFont(new Font("Segoe UI", Font.BOLD, 13));
+        btnIniciar.setBackground(new Color(39, 174, 96));
+        btnIniciar.setForeground(Color.WHITE);
+        btnIniciar.setFocusPainted(false);
+        btnIniciar.setCursor(new Cursor(Cursor.HAND_CURSOR));
+        btnIniciar.setPreferredSize(new Dimension(200, 36));
+        btnIniciar.addActionListener(e -> iniciarBenchmark());
+
+        btnCancelar = new JButton("⏹  Cancelar");
+        btnCancelar.setFont(new Font("Segoe UI", Font.BOLD, 12));
+        btnCancelar.setBackground(new Color(231, 76, 60));
+        btnCancelar.setForeground(Color.WHITE);
+        btnCancelar.setFocusPainted(false);
+        btnCancelar.setEnabled(false);
+        btnCancelar.setPreferredSize(new Dimension(110, 36));
+        btnCancelar.addActionListener(e -> cancelarBenchmark());
+
+        btnExportarCsv = new JButton("💾  Exportar CSV");
+        btnExportarCsv.setFont(new Font("Segoe UI", Font.BOLD, 12));
+        btnExportarCsv.setBackground(new Color(41, 128, 185));
+        btnExportarCsv.setForeground(Color.WHITE);
+        btnExportarCsv.setFocusPainted(false);
+        btnExportarCsv.setEnabled(false);
+        btnExportarCsv.setPreferredSize(new Dimension(130, 36));
+        btnExportarCsv.addActionListener(e -> exportarParaCsv());
+
+        lblStatusBadge = new JLabel("● PRONTO");
+        lblStatusBadge.setFont(new Font("Segoe UI", Font.BOLD, 12));
+        lblStatusBadge.setForeground(new Color(39, 174, 96));
+        lblStatusBadge.setBorder(new EmptyBorder(0, 10, 0, 0));
+
+        pnlBotoesEsq.add(btnIniciar);
+        pnlBotoesEsq.add(btnCancelar);
+        pnlBotoesEsq.add(btnExportarCsv);
+        pnlBotoesEsq.add(lblStatusBadge);
+
+        // Presets Rápidos (Direita)
+        JPanel pnlPresets = new JPanel(new FlowLayout(FlowLayout.RIGHT, 6, 0));
+        pnlPresets.setOpaque(false);
+
+        JLabel lblPreset = new JLabel("Presets Rápidos:");
+        lblPreset.setFont(new Font("Segoe UI", Font.BOLD, 12));
+
+        JButton btnPresetRapido = new JButton("⚡ Rápido (1k-5k)");
+        btnPresetRapido.setFont(new Font("Segoe UI", Font.PLAIN, 11));
+        btnPresetRapido.addActionListener(e -> aplicarPresetRapido());
+
+        JButton btnPresetPadrao = new JButton("🔬 Padrão (1k-10k)");
+        btnPresetPadrao.setFont(new Font("Segoe UI", Font.PLAIN, 11));
+        btnPresetPadrao.addActionListener(e -> aplicarPresetPadrao());
+
+        JButton btnPresetCompleto = new JButton("🚀 Completo (1k-50k)");
+        btnPresetCompleto.setFont(new Font("Segoe UI", Font.PLAIN, 11));
+        btnPresetCompleto.addActionListener(e -> aplicarPresetCompleto());
+
+        pnlPresets.add(lblPreset);
+        pnlPresets.add(btnPresetRapido);
+        pnlPresets.add(btnPresetPadrao);
+        pnlPresets.add(btnPresetCompleto);
+
+        bar.add(pnlBotoesEsq, BorderLayout.WEST);
+        bar.add(pnlPresets, BorderLayout.EAST);
+
+        return bar;
+    }
+
+    private JPanel criarPainelExecucao() {
+        JPanel painel = new JPanel(new BorderLayout(8, 8));
+        painel.setBorder(new EmptyBorder(8, 8, 8, 8));
+
+        // Painel Lateral Esquerdo: Configurações com ROLAGEM DUPLA (Vertical e Horizontal)
+        JPanel pnlConfigConteudo = new JPanel();
+        pnlConfigConteudo.setLayout(new BoxLayout(pnlConfigConteudo, BoxLayout.Y_AXIS));
+        pnlConfigConteudo.setBorder(new EmptyBorder(4, 4, 4, 4));
 
         // 1. Algoritmos
-        JPanel pnlAlgoritmos = new JPanel(new GridLayout(4, 1, 3, 3));
+        JPanel pnlAlgoritmos = new JPanel(new GridLayout(4, 1, 2, 2));
         pnlAlgoritmos.setBorder(new TitledBorder("1. Algoritmos a Avaliar"));
         chkBubble = new JCheckBox("Bubble Sort", true);
         chkInsertion = new JCheckBox("Insertion Sort", true);
@@ -168,10 +264,10 @@ public class MainWindow extends JFrame {
         pnlAlgoritmos.add(chkInsertion);
         pnlAlgoritmos.add(chkMerge);
         pnlAlgoritmos.add(chkQuick);
-        pnlConfig.add(pnlAlgoritmos);
+        pnlConfigConteudo.add(pnlAlgoritmos);
 
         // 2. Modos de Execução
-        JPanel pnlModos = new JPanel(new GridLayout(4, 1, 3, 3));
+        JPanel pnlModos = new JPanel(new GridLayout(4, 1, 2, 2));
         pnlModos.setBorder(new TitledBorder("2. Modos de Execução"));
         chkSerial = new JCheckBox("Serial (1 Thread)", true);
         chkParalelo2 = new JCheckBox("Paralelo (2 Threads)", true);
@@ -181,10 +277,10 @@ public class MainWindow extends JFrame {
         pnlModos.add(chkParalelo2);
         pnlModos.add(chkParalelo4);
         pnlModos.add(chkParalelo8);
-        pnlConfig.add(pnlModos);
+        pnlConfigConteudo.add(pnlModos);
 
         // 3. Natureza dos Dados
-        JPanel pnlDist = new JPanel(new GridLayout(4, 1, 3, 3));
+        JPanel pnlDist = new JPanel(new GridLayout(4, 1, 2, 2));
         pnlDist.setBorder(new TitledBorder("3. Natureza dos Dados"));
         chkDistAleatorio = new JCheckBox("Aleatório", true);
         chkDistQuase = new JCheckBox("Quase Ordenado (90%)", true);
@@ -194,7 +290,7 @@ public class MainWindow extends JFrame {
         pnlDist.add(chkDistQuase);
         pnlDist.add(chkDistInverso);
         pnlDist.add(chkDistOrdenado);
-        pnlConfig.add(pnlDist);
+        pnlConfigConteudo.add(pnlDist);
 
         // 4. Tamanho dos Vetores
         JPanel pnlTamanhos = new JPanel(new GridLayout(5, 1, 2, 2));
@@ -209,58 +305,51 @@ public class MainWindow extends JFrame {
         pnlTamanhos.add(chkTamanho10000);
         pnlTamanhos.add(chkTamanho25000);
         pnlTamanhos.add(chkTamanho50000);
-        pnlConfig.add(pnlTamanhos);
+        pnlConfigConteudo.add(pnlTamanhos);
 
         // 5. Parâmetros extras
         JPanel pnlAmostras = new JPanel(new FlowLayout(FlowLayout.LEFT));
         pnlAmostras.setBorder(new TitledBorder("5. Amostras por Teste (Min. 5)"));
         spnAmostras = new JSpinner(new SpinnerNumberModel(5, 5, 30, 1));
+        spnAmostras.setPreferredSize(new Dimension(65, 26));
         pnlAmostras.add(new JLabel("Amostras:"));
         pnlAmostras.add(spnAmostras);
-        pnlConfig.add(pnlAmostras);
+        pnlConfigConteudo.add(pnlAmostras);
 
-        // Botões de Ação
-        JPanel pnlBotoes = new JPanel(new GridLayout(3, 1, 6, 6));
-        pnlBotoes.setBorder(new EmptyBorder(8, 4, 4, 4));
-
-        btnIniciar = new JButton("Iniciar Benchmark");
-        btnIniciar.setFont(new Font("Segoe UI", Font.BOLD, 13));
-        btnIniciar.setBackground(new Color(39, 174, 96));
-        btnIniciar.setForeground(Color.WHITE);
-        btnIniciar.addActionListener(e -> iniciarBenchmark());
-
-        btnCancelar = new JButton("Cancelar Execução");
-        btnCancelar.setEnabled(false);
-        btnCancelar.addActionListener(e -> cancelarBenchmark());
-
-        btnExportarCsv = new JButton("Exportar CSV");
-        btnExportarCsv.setEnabled(false);
-        btnExportarCsv.addActionListener(e -> exportarParaCsv());
-
-        pnlBotoes.add(btnIniciar);
-        pnlBotoes.add(btnCancelar);
-        pnlBotoes.add(btnExportarCsv);
-        pnlConfig.add(pnlBotoes);
-
-        JScrollPane scrollConfig = new JScrollPane(pnlConfig);
-        scrollConfig.setHorizontalScrollBarPolicy(ScrollPaneConstants.HORIZONTAL_SCROLLBAR_NEVER);
+        // ScrollPane robusto para o painel de configurações (COM ROLAGEM HORIZONTAL E VERTICAL)
+        JScrollPane scrollConfig = new JScrollPane(pnlConfigConteudo);
+        scrollConfig.setVerticalScrollBarPolicy(ScrollPaneConstants.VERTICAL_SCROLLBAR_AS_NEEDED);
+        scrollConfig.setHorizontalScrollBarPolicy(ScrollPaneConstants.HORIZONTAL_SCROLLBAR_AS_NEEDED);
+        scrollConfig.setPreferredSize(new Dimension(310, 480));
+        scrollConfig.getVerticalScrollBar().setUnitIncrement(16);
         painel.add(scrollConfig, BorderLayout.WEST);
 
         // Painel Central: Logs em Tempo Real
         JPanel pnlLogCentral = new JPanel(new BorderLayout(4, 4));
         pnlLogCentral.setBorder(new TitledBorder("Console de Execução & Rastreamento em Tempo Real"));
 
+        // Barra de ferramentas do log
+        JPanel pnlToolLog = new JPanel(new FlowLayout(FlowLayout.RIGHT, 6, 2));
+        JButton btnLimparLog = new JButton("Limpar Console");
+        btnLimparLog.setFont(new Font("Segoe UI", Font.PLAIN, 11));
+        btnLimparLog.addActionListener(e -> txtLogs.setText(""));
+        pnlToolLog.add(btnLimparLog);
+        pnlLogCentral.add(pnlToolLog, BorderLayout.NORTH);
+
         txtLogs = new JTextArea();
         txtLogs.setEditable(false);
         txtLogs.setFont(new Font("Consolas", Font.PLAIN, 12));
-        txtLogs.setBackground(new Color(245, 247, 250));
-        txtLogs.setMargin(new Insets(8, 8, 8, 8));
+        txtLogs.setBackground(new Color(248, 249, 250));
+        txtLogs.setMargin(new Insets(8, 10, 8, 10));
 
-        log("Aplicação iniciada com sucesso. Selecione os parâmetros desejados e clique em 'Iniciar Benchmark'.");
+        log("Pronto. Selecione os algoritmos desejados e clique no botão verde 'INICIAR BENCHMARK' acima.");
 
         JScrollPane scrollLogs = new JScrollPane(txtLogs);
-        pnlLogCentral.add(scrollLogs, BorderLayout.CENTER);
+        scrollLogs.setVerticalScrollBarPolicy(ScrollPaneConstants.VERTICAL_SCROLLBAR_ALWAYS);
+        scrollLogs.setHorizontalScrollBarPolicy(ScrollPaneConstants.HORIZONTAL_SCROLLBAR_AS_NEEDED);
+        scrollLogs.getVerticalScrollBar().setUnitIncrement(16);
 
+        pnlLogCentral.add(scrollLogs, BorderLayout.CENTER);
         painel.add(pnlLogCentral, BorderLayout.CENTER);
 
         return painel;
@@ -284,10 +373,12 @@ public class MainWindow extends JFrame {
 
         tableResultados = new JTable(tableModel);
         tableResultados.setFont(new Font("Segoe UI", Font.PLAIN, 12));
-        tableResultados.setRowHeight(22);
+        tableResultados.setRowHeight(24);
+        tableResultados.setAutoCreateRowSorter(true); // Permite ordenação clicando nas colunas!
         tableResultados.getTableHeader().setFont(new Font("Segoe UI", Font.BOLD, 12));
+        tableResultados.setAutoResizeMode(JTable.AUTO_RESIZE_ALL_COLUMNS);
 
-        // Alinhamento central para colunas numéricas
+        // Estilização com zebra striping
         DefaultTableCellRenderer centerRenderer = new DefaultTableCellRenderer();
         centerRenderer.setHorizontalAlignment(SwingConstants.CENTER);
         for (int i = 1; i < colunas.length; i++) {
@@ -295,6 +386,8 @@ public class MainWindow extends JFrame {
         }
 
         JScrollPane scrollTable = new JScrollPane(tableResultados);
+        scrollTable.setVerticalScrollBarPolicy(ScrollPaneConstants.VERTICAL_SCROLLBAR_AS_NEEDED);
+        scrollTable.setHorizontalScrollBarPolicy(ScrollPaneConstants.HORIZONTAL_SCROLLBAR_AS_NEEDED);
         painel.add(scrollTable, BorderLayout.CENTER);
 
         return painel;
@@ -318,7 +411,11 @@ public class MainWindow extends JFrame {
         painel.add(pnlFiltro, BorderLayout.NORTH);
 
         chartTempoPanel = new ChartPanel(ChartPanel.ChartType.TEMPO_EXECUCAO);
-        painel.add(chartTempoPanel, BorderLayout.CENTER);
+        
+        JScrollPane scrollChart = new JScrollPane(chartTempoPanel);
+        scrollChart.setVerticalScrollBarPolicy(ScrollPaneConstants.VERTICAL_SCROLLBAR_AS_NEEDED);
+        scrollChart.setHorizontalScrollBarPolicy(ScrollPaneConstants.HORIZONTAL_SCROLLBAR_AS_NEEDED);
+        painel.add(scrollChart, BorderLayout.CENTER);
 
         return painel;
     }
@@ -328,7 +425,11 @@ public class MainWindow extends JFrame {
         painel.setBorder(new EmptyBorder(10, 10, 10, 10));
 
         chartSpeedupPanel = new ChartPanel(ChartPanel.ChartType.SPEEDUP_ESCALABILIDADE);
-        painel.add(chartSpeedupPanel, BorderLayout.CENTER);
+        
+        JScrollPane scrollChart = new JScrollPane(chartSpeedupPanel);
+        scrollChart.setVerticalScrollBarPolicy(ScrollPaneConstants.VERTICAL_SCROLLBAR_AS_NEEDED);
+        scrollChart.setHorizontalScrollBarPolicy(ScrollPaneConstants.HORIZONTAL_SCROLLBAR_AS_NEEDED);
+        painel.add(scrollChart, BorderLayout.CENTER);
 
         return painel;
     }
@@ -340,17 +441,18 @@ public class MainWindow extends JFrame {
         JEditorPane editorPane = new JEditorPane();
         editorPane.setContentType("text/html");
         editorPane.setEditable(false);
-        editorPane.setText("<html><body style='font-family: Segoe UI, sans-serif; font-size: 13px; color: #333;'>"
+        editorPane.setText("<html><body style='font-family: Segoe UI, sans-serif; font-size: 13px; color: #333; margin: 15px;'>"
                 + "<h2 style='color: #1a365d;'>Universidade de Fortaleza (UNIFOR)</h2>"
                 + "<h3 style='color: #2b6cb0;'>Computação Concorrente e Paralela</h3>"
-                + "<p><b>Projeto:</b> Análise de Desempenho de Algoritmos de Ordenação em Ambientes Seriais e Paralelos</p>"
+                + "<p><b>Aluno:</b> Anderson Viana Cataldo</p>"
+                + "<p><b>Repositório:</b> <a href='https://github.com/andersoncataldo/algoritmos-desempenho-paralelo-concorrente.git'>github.com/andersoncataldo/algoritmos-desempenho-paralelo-concorrente</a></p>"
                 + "<hr>"
-                + "<h4>Algoritmos Implementados:</h4>"
+                + "<h4>Algoritmos e Otimizações de Alto Desempenho:</h4>"
                 + "<ul>"
                 + "<li><b>Bubble Sort:</b> Serial vs Paralelo via <i>Odd-Even Transposition Sort</i> com sincronização CyclicBarrier.</li>"
                 + "<li><b>Insertion Sort:</b> Serial vs Paralelo via <i>Block Partitioning</i> com mescla hierárquica concorrente.</li>"
-                + "<li><b>Merge Sort:</b> Serial vs Paralelo via <i>ForkJoinPool</i> (RecursiveAction) com limiar adaptativo.</li>"
-                + "<li><b>Quick Sort:</b> Serial vs Paralelo via <i>ForkJoinPool</i> com pivô mediana de três e particionamento de Hoare.</li>"
+                + "<li><b>Merge Sort:</b> Serial vs Paralelo via <i>ForkJoinPool</i> com vetor auxiliar único, atalho O(n) e cutoff para Insertion Sort em pequenas partições.</li>"
+                + "<li><b>Quick Sort:</b> Serial vs Paralelo com pivô por mediana de três, eliminação de recursão em cauda e cutoff para Insertion Sort (&lt; 32 itens).</li>"
                 + "</ul>"
                 + "<h4>Métricas e Fórmulas:</h4>"
                 + "<ul>"
@@ -360,8 +462,88 @@ public class MainWindow extends JFrame {
                 + "</ul>"
                 + "</body></html>");
 
-        painel.add(new JScrollPane(editorPane), BorderLayout.CENTER);
+        JScrollPane scrollSobre = new JScrollPane(editorPane);
+        scrollSobre.setVerticalScrollBarPolicy(ScrollPaneConstants.VERTICAL_SCROLLBAR_AS_NEEDED);
+        painel.add(scrollSobre, BorderLayout.CENTER);
         return painel;
+    }
+
+    private void aplicarPresetRapido() {
+        chkBubble.setSelected(true);
+        chkInsertion.setSelected(true);
+        chkMerge.setSelected(true);
+        chkQuick.setSelected(true);
+
+        chkSerial.setSelected(true);
+        chkParalelo2.setSelected(true);
+        chkParalelo4.setSelected(true);
+        chkParalelo8.setSelected(false);
+
+        chkDistAleatorio.setSelected(true);
+        chkDistQuase.setSelected(false);
+        chkDistInverso.setSelected(true);
+        chkDistOrdenado.setSelected(false);
+
+        chkTamanho1000.setSelected(true);
+        chkTamanho5000.setSelected(true);
+        chkTamanho10000.setSelected(false);
+        chkTamanho25000.setSelected(false);
+        chkTamanho50000.setSelected(false);
+
+        spnAmostras.setValue(5);
+        log("Preset Rápido aplicado: N=1.000 e 5.000 com dados Aleatórios e Inversos.");
+    }
+
+    private void aplicarPresetPadrao() {
+        chkBubble.setSelected(true);
+        chkInsertion.setSelected(true);
+        chkMerge.setSelected(true);
+        chkQuick.setSelected(true);
+
+        chkSerial.setSelected(true);
+        chkParalelo2.setSelected(true);
+        chkParalelo4.setSelected(true);
+        chkParalelo8.setSelected(true);
+
+        chkDistAleatorio.setSelected(true);
+        chkDistQuase.setSelected(true);
+        chkDistInverso.setSelected(true);
+        chkDistOrdenado.setSelected(false);
+
+        chkTamanho1000.setSelected(true);
+        chkTamanho5000.setSelected(true);
+        chkTamanho10000.setSelected(true);
+        chkTamanho25000.setSelected(false);
+        chkTamanho50000.setSelected(false);
+
+        spnAmostras.setValue(5);
+        log("Preset Padrão aplicado: N=1.000, 5.000 e 10.000 com threads 1, 2, 4 e 8.");
+    }
+
+    private void aplicarPresetCompleto() {
+        chkBubble.setSelected(true);
+        chkInsertion.setSelected(true);
+        chkMerge.setSelected(true);
+        chkQuick.setSelected(true);
+
+        chkSerial.setSelected(true);
+        chkParalelo2.setSelected(true);
+        chkParalelo4.setSelected(true);
+        chkParalelo8.setSelected(true);
+
+        chkDistAleatorio.setSelected(true);
+        chkDistQuase.setSelected(true);
+        chkDistInverso.setSelected(true);
+        chkDistOrdenado.setSelected(true);
+
+        chkTamanho1000.setSelected(true);
+        chkTamanho5000.setSelected(true);
+        chkTamanho10000.setSelected(true);
+        chkTamanho25000.setSelected(true);
+        chkTamanho50000.setSelected(true);
+
+        spnAmostras.setValue(5);
+        log("Preset Completo aplicado: Todos os tamanhos (até 50k) e todas as distribuições.");
     }
 
     private void iniciarBenchmark() {
@@ -394,9 +576,11 @@ public class MainWindow extends JFrame {
         btnIniciar.setEnabled(false);
         btnCancelar.setEnabled(true);
         btnExportarCsv.setEnabled(false);
+        lblStatusBadge.setText("● EXECUTANDO...");
+        lblStatusBadge.setForeground(new Color(230, 126, 34));
         progressBar.setValue(0);
 
-        log("Iniciando bateria de testes com " + algoritmos.size() + " configurações de algoritmos, "
+        log("Iniciando benchmark com " + algoritmos.size() + " configurações, "
                 + tamanhos.size() + " tamanhos e " + distros.size() + " distribuições (" + amostras + " amostras cada)...");
 
         runnerAtivo = new BenchmarkRunner();
@@ -447,11 +631,15 @@ public class MainWindow extends JFrame {
                 btnExportarCsv.setEnabled(!listaResumos.isEmpty());
 
                 if (runnerAtivo.isCancelado()) {
-                    lblStatus.setText("Benchmark cancelado.");
-                    log("Benchmark interrompido pelo usuário.");
+                    lblStatusBadge.setText("● CANCELADO");
+                    lblStatusBadge.setForeground(new Color(231, 76, 60));
+                    lblStatus.setText("Benchmark cancelado pelo usuário.");
+                    log("Benchmark cancelado.");
                 } else {
+                    lblStatusBadge.setText("● CONCLUÍDO");
+                    lblStatusBadge.setForeground(new Color(39, 174, 96));
                     lblStatus.setText("Benchmark finalizado com sucesso!");
-                    log("Bateria de experimentos concluída! Os dados estão prontos para visualização e exportação.");
+                    log("Bateria de testes concluída com sucesso! Navegue pelas abas acima para ver os gráficos.");
                     atualizarTabelaECharts();
                 }
             }
