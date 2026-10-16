@@ -158,11 +158,11 @@ public class MainWindow extends JFrame {
         tabbedPane = new JTabbedPane();
         tabbedPane.setFont(new Font("Segoe UI", Font.BOLD, 13));
 
-        tabbedPane.addTab("⚡ Execução & Logs", criarPainelExecucao());
-        tabbedPane.addTab("📊 Tabela Estatística", criarPainelTabela());
-        tabbedPane.addTab("📈 Gráfico de Tempos (ms)", criarPainelGraficoTempo());
-        tabbedPane.addTab("🚀 Gráfico de Speedup", criarPainelGraficoSpeedup());
-        tabbedPane.addTab("ℹ️ Sobre o Projeto", criarPainelSobre());
+        tabbedPane.addTab("Execucao e Logs", criarPainelExecucao());
+        tabbedPane.addTab("Tabela Estatistica", criarPainelTabela());
+        tabbedPane.addTab("Grafico de Tempos (ms)", criarPainelGraficoTempo());
+        tabbedPane.addTab("Grafico de Speedup", criarPainelGraficoSpeedup());
+        tabbedPane.addTab("Sobre o Projeto", criarPainelSobre());
 
         JPanel pnlCentro = new JPanel(new BorderLayout(0, 0));
         pnlCentro.add(pnlAcoesFixas, BorderLayout.NORTH);
@@ -199,35 +199,32 @@ public class MainWindow extends JFrame {
                 new EmptyBorder(4, 8, 4, 8)
         ));
 
-        // Botões de Execução (com dimensões adequadas a toque em tablets)
-        btnIniciar = new JButton("▶  INICIAR BENCHMARK");
+        // Botões de Execução (com dimensões adequadas a toque em tablets e alto contraste)
+        btnIniciar = new JButton("INICIAR BENCHMARK");
         btnIniciar.setFont(new Font("Segoe UI", Font.BOLD, 13));
-        btnIniciar.setBackground(new Color(39, 174, 96));
-        btnIniciar.setForeground(Color.WHITE);
+        btnIniciar.setForeground(new Color(20, 120, 50));
         btnIniciar.setFocusPainted(false);
         btnIniciar.setCursor(new Cursor(Cursor.HAND_CURSOR));
-        btnIniciar.setPreferredSize(new Dimension(195, 36));
+        btnIniciar.setPreferredSize(new Dimension(185, 36));
         btnIniciar.addActionListener(e -> iniciarBenchmark());
 
-        btnCancelar = new JButton("⏹  Cancelar");
+        btnCancelar = new JButton("Cancelar");
         btnCancelar.setFont(new Font("Segoe UI", Font.BOLD, 12));
-        btnCancelar.setBackground(new Color(231, 76, 60));
-        btnCancelar.setForeground(Color.WHITE);
+        btnCancelar.setForeground(new Color(170, 30, 30));
         btnCancelar.setFocusPainted(false);
         btnCancelar.setEnabled(false);
-        btnCancelar.setPreferredSize(new Dimension(105, 36));
+        btnCancelar.setPreferredSize(new Dimension(95, 36));
         btnCancelar.addActionListener(e -> cancelarBenchmark());
 
-        btnExportarCsv = new JButton("💾  Exportar CSV");
+        btnExportarCsv = new JButton("Exportar CSV");
         btnExportarCsv.setFont(new Font("Segoe UI", Font.BOLD, 12));
-        btnExportarCsv.setBackground(new Color(41, 128, 185));
-        btnExportarCsv.setForeground(Color.WHITE);
+        btnExportarCsv.setForeground(new Color(25, 90, 160));
         btnExportarCsv.setFocusPainted(false);
         btnExportarCsv.setEnabled(false);
-        btnExportarCsv.setPreferredSize(new Dimension(125, 36));
+        btnExportarCsv.setPreferredSize(new Dimension(120, 36));
         btnExportarCsv.addActionListener(e -> exportarParaCsv());
 
-        lblStatusBadge = new JLabel("● PRONTO");
+        lblStatusBadge = new JLabel("[PRONTO]");
         lblStatusBadge.setFont(new Font("Segoe UI", Font.BOLD, 12));
         lblStatusBadge.setForeground(new Color(39, 174, 96));
         lblStatusBadge.setBorder(new EmptyBorder(0, 6, 0, 12));
@@ -236,23 +233,23 @@ public class MainWindow extends JFrame {
         JSeparator sep = new JSeparator(SwingConstants.VERTICAL);
         sep.setPreferredSize(new Dimension(2, 30));
 
-        // Presets Rápidos
+        // Presets Rápidos (sem emojis para evitar caracteres quebrados em fontes de sistema)
         JLabel lblPreset = new JLabel("Presets:");
         lblPreset.setFont(new Font("Segoe UI", Font.BOLD, 12));
 
-        JButton btnPresetRapido = new JButton("⚡ Rápido (1k-5k)");
+        JButton btnPresetRapido = new JButton("Rapido (1k-5k)");
         btnPresetRapido.setFont(new Font("Segoe UI", Font.PLAIN, 11));
-        btnPresetRapido.setPreferredSize(new Dimension(125, 32));
+        btnPresetRapido.setPreferredSize(new Dimension(120, 32));
         btnPresetRapido.addActionListener(e -> aplicarPresetRapido());
 
-        JButton btnPresetPadrao = new JButton("🔬 Padrão (1k-10k)");
+        JButton btnPresetPadrao = new JButton("Padrao (1k-10k)");
         btnPresetPadrao.setFont(new Font("Segoe UI", Font.PLAIN, 11));
-        btnPresetPadrao.setPreferredSize(new Dimension(135, 32));
+        btnPresetPadrao.setPreferredSize(new Dimension(125, 32));
         btnPresetPadrao.addActionListener(e -> aplicarPresetPadrao());
 
-        JButton btnPresetCompleto = new JButton("🚀 Completo (1k-50k)");
+        JButton btnPresetCompleto = new JButton("Completo (1k-50k)");
         btnPresetCompleto.setFont(new Font("Segoe UI", Font.PLAIN, 11));
-        btnPresetCompleto.setPreferredSize(new Dimension(145, 32));
+        btnPresetCompleto.setPreferredSize(new Dimension(135, 32));
         btnPresetCompleto.addActionListener(e -> aplicarPresetCompleto());
 
         bar.add(btnIniciar);
@@ -605,7 +602,7 @@ public class MainWindow extends JFrame {
         btnIniciar.setEnabled(false);
         btnCancelar.setEnabled(true);
         btnExportarCsv.setEnabled(false);
-        lblStatusBadge.setText("● EXECUTANDO...");
+        lblStatusBadge.setText("[EXECUTANDO...]");
         lblStatusBadge.setForeground(new Color(230, 126, 34));
         progressBar.setValue(0);
 
@@ -660,12 +657,12 @@ public class MainWindow extends JFrame {
                 btnExportarCsv.setEnabled(!listaResumos.isEmpty());
 
                 if (runnerAtivo.isCancelado()) {
-                    lblStatusBadge.setText("● CANCELADO");
+                    lblStatusBadge.setText("[CANCELADO]");
                     lblStatusBadge.setForeground(new Color(231, 76, 60));
                     lblStatus.setText("Benchmark cancelado pelo usuário.");
                     log("Benchmark cancelado.");
                 } else {
-                    lblStatusBadge.setText("● CONCLUÍDO");
+                    lblStatusBadge.setText("[CONCLUIDO]");
                     lblStatusBadge.setForeground(new Color(39, 174, 96));
                     lblStatus.setText("Benchmark finalizado com sucesso!");
                     log("Bateria de testes concluída com sucesso! Navegue pelas abas acima para ver os gráficos.");
